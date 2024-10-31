@@ -369,7 +369,11 @@ class Birdton {
   }
 
   countdown(seconds) {
+    let lastOutput = "";
+
     return new Promise((resolve) => {
+      process.stdout.write("\n"); // Initial newline for clean display
+
       const timer = setInterval(() => {
         const hours = String(Math.floor(seconds / 3600)).padStart(2, "0");
         const minutes = String(Math.floor((seconds % 3600) / 60)).padStart(
@@ -377,12 +381,20 @@ class Birdton {
           "0"
         );
         const remainingSeconds = String(seconds % 60).padStart(2, "0");
+        const output = `Time until next cycle: ${hours}:${minutes}:${remainingSeconds}`;
 
-        logger.info(`Time remaining: ${hours}:${minutes}:${remainingSeconds}`);
+        // Clear previous line and write new one
+        process.stdout.write(
+          "\r" + " ".repeat(lastOutput.length) + "\r" + output
+        );
+        lastOutput = output;
         seconds--;
 
         if (seconds < 0) {
           clearInterval(timer);
+          // Clear the countdown line when done
+          process.stdout.write("\r" + " ".repeat(lastOutput.length) + "\r");
+          process.stdout.write("\n"); // Add newline for clean separation
           resolve();
         }
       }, 1000);
@@ -413,8 +425,9 @@ class Birdton {
         await this.waitForTaskCompletion();
       }
 
-      logger.info("Cycle completed. Waiting for next iteration");
+      logger.info("Cycle completed. Starting countdown for next iteration");
       await this.countdown(3600);
+      logger.info("Starting new cycle");
     }
   }
 
