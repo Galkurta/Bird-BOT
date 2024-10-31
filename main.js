@@ -305,7 +305,7 @@ class Birdton {
     logger.info(
       `Game results - Score: ${
         gameSavedData.score
-      }, Balance: ${this.formatBalance(gameSavedData.balance)}, Energy: ${
+      } | Balance: ${this.formatBalance(gameSavedData.balance)} | Energy: ${
         this.state.remainingEnergy
       }`
     );
