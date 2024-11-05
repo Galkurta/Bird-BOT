@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const WebSocket = require("ws");
+const readline = require("readline");
 const logger = require("./config/logger");
 const printBanner = require("./config/banner");
 
@@ -28,6 +29,7 @@ class Birdton {
           "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
       },
       maxBoostLevel: 49,
+      autoBuyBoost: true,
     };
 
     this.state = {
@@ -45,17 +47,40 @@ class Birdton {
     };
   }
 
+  async promptBuyBoostSettings() {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+
+    return new Promise((resolve) => {
+      console.log("\nBOOST UPGRADE SETTINGS");
+      console.log("====================");
+      console.log("1. Automatic (Bot will automatically upgrade boosts)");
+      console.log("2. Manual (Bot will only play games)\n");
+
+      rl.question("Select boost upgrade mode (1/2): ", (answer) => {
+        rl.close();
+        const isAutoBuy = answer.trim() === "1";
+        this.config.autoBuyBoost = isAutoBuy;
+        console.log(
+          `\nSelected mode: ${
+            isAutoBuy ? "Automatic" : "Manual"
+          } boost upgrades`
+        );
+        resolve();
+      });
+    });
+  }
+
   formatBalance(balance) {
     if (balance >= 1000000000) {
-      // Billions
       return `${(balance / 1000000000).toFixed(1)}B`;
     }
     if (balance >= 1000000) {
-      // Millions
       return `${(balance / 1000000).toFixed(1)}M`;
     }
     if (balance >= 1000) {
-      // Thousands
       return `${(balance / 1000).toFixed(1)}K`;
     }
     return balance.toString();
@@ -151,6 +176,12 @@ class Birdton {
   }
 
   async buyBoost(boostId, boostValue) {
+    if (!this.config.autoBuyBoost) {
+      logger.info("Manual mode: Skipping boost upgrade. Starting game...");
+      this.sendGameIdMessage();
+      return;
+    }
+
     if (boostValue >= this.config.maxBoostLevel) {
       logger.info("Maximum boost level reached. Starting game...");
       this.sendGameIdMessage();
@@ -247,19 +278,23 @@ class Birdton {
     this.state.coinValues = coinValues;
     this.state.currentBoost = boost;
 
-    if (boostValue >= this.config.maxBoostLevel) {
-      logger.info(`Maximum boost level ${this.config.maxBoostLevel} reached`);
-      this.sendGameIdMessage();
-      return;
-    }
-
     const requiredCoinValue = coinValues[boostValue] || 0;
     logger.info(
       `Boost status - Level: ${boostValue} | Required coins: ${this.formatBalance(
         requiredCoinValue
-      )}`
+      )} | Mode: ${this.config.autoBuyBoost ? "Automatic" : "Manual"}`
     );
-    await this.buyBoost(boost.id, boostValue);
+
+    if (this.config.autoBuyBoost) {
+      if (boostValue >= this.config.maxBoostLevel) {
+        logger.info(`Maximum boost level ${this.config.maxBoostLevel} reached`);
+        this.sendGameIdMessage();
+        return;
+      }
+      await this.buyBoost(boost.id, boostValue);
+    } else {
+      this.sendGameIdMessage();
+    }
   }
 
   async handleBuyBoostResult(message) {
@@ -403,6 +438,7 @@ class Birdton {
 
   async main() {
     printBanner();
+    await this.promptBuyBoostSettings();
 
     const dataFile = path.join(__dirname, "data.txt");
     const tokens = fs
